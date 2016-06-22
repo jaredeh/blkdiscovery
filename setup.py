@@ -9,7 +9,7 @@ setup(
     license = 'MIT',
     maintainer = 'Jared Hulbert',
     maintainer_email = 'jaredeh@gmail.com',
-    url = 'http://github.com/agrover/targetd',
+    url = 'https://github.com/jaredeh/blkdiscovery.git',
     packages = ['blkdiscovery'],
     scripts = ['scripts/blkdiscovery'],
     )

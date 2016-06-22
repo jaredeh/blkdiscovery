@@ -1,8 +1,8 @@
-import blkid
-import hdparm
-import lsblk
-import lshw
-import lsstoragecntlr
+from . import blkid
+from . import hdparm
+from . import lsblk
+from . import lshw
+from . import lsstoragecntlr
 import re
 
 
@@ -201,11 +201,3 @@ class BlkDiscovery:
                 details['mounted'] = True
             else:
                 details['mounted'] = False
-if __name__ == '__main__':
-    import pprint
-    pp = pprint.PrettyPrinter(indent=4)
-    bd = BlkDiscovery()
-    disks = bd.disks()
-    pp.pprint(disks)
-    devdata = bd.details()
-    pp.pprint(devdata)
