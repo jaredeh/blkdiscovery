@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name = 'blkdiscovery',
-    version = '0.0.1',
+    version = '0.0.2',
     description = 'Finds block devices and extracts lots of details from Linux',
     license = 'MIT',
     maintainer = 'Jared Hulbert',
