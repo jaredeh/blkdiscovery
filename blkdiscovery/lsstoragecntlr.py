@@ -18,31 +18,28 @@ class LsStorageController:
             return retval
         return str(json)
 
-    def get_block_devices(self):
-        devicepath = "/sys/block"
-        diskdevices = os.listdir(devicepath)
-        return diskdevices
-
-    def lspci_data(self):
+    def subprocess_check_output(self,cmdarray):
         try:
-            rawoutput = subprocess.check_output(['lspci'], stderr=subprocess.STDOUT)
+            rawoutput = subprocess.check_output(cmdarray, stderr=subprocess.STDOUT)
         except Exception:
             return ""
         if type(rawoutput) == bytes:
             output = rawoutput.decode("utf-8")
         return output
 
+    def get_block_devices(self):
+        devicepath = "/sys/block"
+        diskdevices = os.listdir(devicepath)
+        return diskdevices
+
+    def lspci_data(self):
+        return self.subprocess_check_output(['lspci'])
+
     def diskbypaths(self):
-        rawoutput = subprocess.check_output(['ls', '-alh', '/dev/disk/by-path'], stderr=subprocess.STDOUT)
-        if type(rawoutput) == bytes:
-            output = rawoutput.decode("utf-8")
-        return output
+        return self.subprocess_check_output(['ls', '-alh', '/dev/disk/by-path'])
 
     def sysblock(self):
-        rawoutput = subprocess.check_output(['ls', '-alh', '/sys/block/'], stderr=subprocess.STDOUT)
-        if type(rawoutput) == bytes:
-            output = rawoutput.decode("utf-8")
-        return output
+        return self.subprocess_check_output(['ls', '-alh', '/sys/block/'])
 
     def disk_pcideviceid(self,diskdevice):
         for item in self.diskbypaths().splitlines():

@@ -1,5 +1,4 @@
 import sys
-import pprint
 import subprocess
 import json
 
