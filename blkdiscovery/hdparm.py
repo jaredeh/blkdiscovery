@@ -1,22 +1,11 @@
-import pprint
-import subprocess
 import re
-import sys
+#hack for python2 support
+try:
+    from .blkdiscoveryutil import *
+except:
+    from blkdiscoveryutil import *
 
-class Hdparm:
-
-    def stringify(self,json):
-        if type(json) == dict:
-            retval = {}
-            for key, value  in json.items():
-                retval[str(key)] = self.stringify(value)
-            return retval
-        if type(json) == list:
-            retval = []
-            for element in json:
-                retval.append(self.stringify(element))
-            return retval
-        return str(json)
+class Hdparm(BlkDiscoveryUtil):
 
     def details(self,device):
         devdata = {}
@@ -57,19 +46,9 @@ class Hdparm:
 
     def read_hdparm_data(self,device):
         try:
-            rawdata = subprocess.Popen(['hdparm', '-I', device], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-            hdparmdata = rawdata[0]
-            if type(hdparmdata) == bytes:
-                hdparmdata = hdparmdata.decode("utf-8")
-            errordata = rawdata[1]
-            if type(errordata) == bytes:
-                errordata = errordata.decode("utf-8")
-            if len(errordata) > 1:
-                raise OSError
-            return hdparmdata.splitlines()
-        except (OSError, UnicodeDecodeError):
-            global hdparmerror
-            hdparmerror = True
+            rawdata = self.subprocess_check_output(['hdparm', '-I', device])
+            return rawdata.splitlines()
+        except:
             return [""]
 
     def single_space(self,string):
@@ -173,40 +152,6 @@ class Hdparm:
                     return vendor_name
         return None
 
-    def decimalsize(self,value):
-        prefixes = "KMGTPEZY"
-        i = 0
-        out = ""
-        while ((i <= len(prefixes)) and ((value > 10000) or (value % 1000 == 0))):
-            value = int(value / 1000)
-            i += 1
-
-        out += str(value)
-
-        if i > len(prefixes):
-            raise "value too big"
-        if i > 0:
-            out += " " + prefixes[i - 1]
-
-        return out + "B"
-
-    def binarysize(self,value):
-        prefixes = "KMGTPEZY"
-        i = 0
-        out = ""
-        while ((i <= len(prefixes)) and ((value > 10240) or (value % 1024 == 0))):
-            value = value  >> 10
-            i += 1
-
-        out += str(value)
-
-        if i > len(prefixes):
-            raise "value too big"
-        if i > 0:
-            out += " " + prefixes[i - 1]
-
-        return out + "iB"
-
     def scrub(self,devdata):
         for key, section in devdata.items():
             if key == "Device":
@@ -230,6 +175,8 @@ class Hdparm:
                 continue
 
 if __name__ == '__main__':
+    import pprint
+    import sys
     pp = pprint.PrettyPrinter(indent=4)
     hp = Hdparm()
     devdata = hp.details(sys.argv[1])

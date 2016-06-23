@@ -1,21 +1,11 @@
-import sys
-import subprocess
 import json
+#hack for python2 support
+try:
+    from .blkdiscoveryutil import *
+except:
+    from blkdiscoveryutil import *
 
-class LsBlk:
-
-    def stringify(self,json):
-        if type(json) == dict:
-            retval = {}
-            for key, value  in json.items():
-                retval[str(key)] = self.stringify(value)
-            return retval
-        if type(json) == list:
-            retval = []
-            for element in json:
-                retval.append(self.stringify(element))
-            return retval
-        return str(json)
+class LsBlk(BlkDiscoveryUtil):
 
     def disks(self):
         retval = []
@@ -41,9 +31,7 @@ class LsBlk:
 
     def details(self):
         retval = {}
-        rawoutput = subprocess.check_output(["lsblk", '--json', '-O', '-p'], stderr=subprocess.STDOUT)
-        if type(rawoutput) == bytes:
-            rawoutput = rawoutput.decode("utf-8")
+        rawoutput = self.subprocess_check_output(["lsblk", '--json', '-O', '-p'])
         parent = json.loads(rawoutput)
         for child in parent.get('blockdevices',[]):
             #print child['id'] + child['class']

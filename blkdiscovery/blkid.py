@@ -1,23 +1,12 @@
 import os
-import sys
-import subprocess
 import re
-import pprint
+#hack for python2 support
+try:
+    from .blkdiscoveryutil import *
+except:
+    from blkdiscoveryutil import *
 
-class Blkid:
-
-    def stringify(self,json):
-        if type(json) == dict:
-            retval = {}
-            for key, value  in json.items():
-                retval[str(key)] = self.stringify(value)
-            return retval
-        if type(json) == list:
-            retval = []
-            for element in json:
-                retval.append(self.stringify(element))
-            return retval
-        return str(json)
+class Blkid(BlkDiscoveryUtil):
 
     def parse_line(self,line):
         details = {}
@@ -68,15 +57,12 @@ class Blkid:
         return retval
 
     def call_blkid(self,device=None):
-        pp = pprint.PrettyPrinter(indent=4)
         retval = {}
-        subprocess.check_output(["blkid", '-g'], stderr=subprocess.STDOUT)
+        self.subprocess_check_output(["blkid", '-g'])
         cmdarray = ["blkid", '-o', 'full']
         if device:
             cmdarray.append(device)
-        rawoutput = subprocess.check_output(cmdarray, stderr=subprocess.STDOUT)
-        if type(rawoutput) == bytes:
-            rawoutput = rawoutput.decode("utf-8")
+        rawoutput = self.subprocess_check_output(cmdarray)
         for line in rawoutput.splitlines():
             path, details = self.parse_line(line)
             retval[path] = details

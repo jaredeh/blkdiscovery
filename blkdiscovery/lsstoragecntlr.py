@@ -1,31 +1,12 @@
 import re
-import subprocess
-import sys
 import os
+#hack for python2 support
+try:
+    from .blkdiscoveryutil import *
+except:
+    from blkdiscoveryutil import *
 
-class LsStorageController:
-
-    def stringify(self,json):
-        if type(json) == dict:
-            retval = {}
-            for key, value  in json.items():
-                retval[str(key)] = self.stringify(value)
-            return retval
-        if type(json) == list:
-            retval = []
-            for element in json:
-                retval.append(self.stringify(element))
-            return retval
-        return str(json)
-
-    def subprocess_check_output(self,cmdarray):
-        try:
-            rawoutput = subprocess.check_output(cmdarray, stderr=subprocess.STDOUT)
-        except Exception:
-            return ""
-        if type(rawoutput) == bytes:
-            output = rawoutput.decode("utf-8")
-        return output
+class LsStorageController(BlkDiscoveryUtil):
 
     def get_block_devices(self):
         devicepath = "/sys/block"
@@ -65,7 +46,6 @@ class LsStorageController:
                         if not details.get('storagepath'):
                             details['storagepath'] = path
                         return
-
 
     def get_storage_path(self,disk,details):
         for item in self.diskbypaths().splitlines():

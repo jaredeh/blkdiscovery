@@ -1,21 +1,11 @@
-import sys
-import subprocess
 import json
+#hack for python2 support
+try:
+    from .blkdiscoveryutil import *
+except:
+    from blkdiscoveryutil import *
 
-class LsHw:
-
-    def stringify(self,json):
-        if type(json) == dict:
-            retval = {}
-            for key, value  in json.items():
-                retval[str(key)] = self.stringify(value)
-            return retval
-        if type(json) == list:
-            retval = []
-            for element in json:
-                retval.append(self.stringify(element))
-            return retval
-        return str(json)
+class LsHw(BlkDiscoveryUtil):
 
     def bustype(self,storage):
         capabilities = storage.get('capabilities',{})
@@ -45,14 +35,17 @@ class LsHw:
 
     def details(self):
         retval = {}
-        rawoutput = subprocess.check_output(["lshw", '-json'], stderr=subprocess.STDOUT)
-        if type(rawoutput) == bytes:
-            rawoutput = rawoutput.decode("utf-8")
-        parent = json.loads(rawoutput)
+        rawoutput = self.subprocess_check_output(["lshw", '-json'])
+        try:
+            parent = json.loads(rawoutput)
+        except:
+            #if the json fails, look at running as root
+            parent = {}
         self.iterate_disks(parent,retval,"")
         return self.stringify(retval)
 
 if __name__ == '__main__':
+    import pprint
     pp = pprint.PrettyPrinter(indent=4)
     lshw = LsHw()
     devdata = lshw.details()
