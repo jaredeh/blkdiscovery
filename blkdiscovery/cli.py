@@ -4,7 +4,7 @@ import json
 from .blkdiscovery import BlkDiscovery
 
 
-def main():
+def main() -> None:
     """Main CLI entry point for blkdiscovery."""
     bd = BlkDiscovery()
     disks = bd.disks()

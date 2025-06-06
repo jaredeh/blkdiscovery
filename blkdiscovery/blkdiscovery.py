@@ -4,35 +4,33 @@ from . import lsblk
 from . import lshw
 from . import lsstoragecntlr
 import re
+from typing import Dict, List, Optional, Any, Union
+from .types import DeviceDetails, DiskList, DatasetKeyPair
 
 
 class BlkDiscovery:
 
-    def __init__(self):
-        self.lsblk = lsblk.LsBlk()
-        self.lshw = lshw.LsHw()
-        self.blkid = blkid.Blkid()
-        self.lsstoragecntlr = lsstoragecntlr.LsStorageController()
-        self.hdparm = hdparm.Hdparm()
+    def __init__(self) -> None:
+        self.lsblk: lsblk.LsBlk = lsblk.LsBlk()
+        self.lshw: lshw.LsHw = lshw.LsHw()
+        self.blkid: blkid.Blkid = blkid.Blkid()
+        self.lsstoragecntlr: lsstoragecntlr.LsStorageController = lsstoragecntlr.LsStorageController()
+        self.hdparm: hdparm.Hdparm = hdparm.Hdparm()
 
-    def disks(self):
+    def disks(self) -> DiskList:
         return self.lsblk.disks()
 
-    def extract_value(self,dataset,disk,keylist):
-        if not dataset.get(disk):
+    def extract_value(self, dataset: Dict[str, Any], disk: str, keylist: List[str]) -> Optional[str]:
+        if not (data := dataset.get(disk)):
             return None
-        data = dataset[disk]
-        keys = list(keylist)
-        for i in range(len(keys)):
-            key = keys.pop(0)
-            if not data.get(key):
+
+        for key in keylist:
+            if not (data := data.get(key)):
                 return None
-            data = data[key]
-            if len(keys) == 0:
-                return data
+        return data
 
 
-    def find_children(self,disk,retval,keypairs,dataset):
+    def find_children(self, disk: str, retval: Dict[str, Any], keypairs: Dict[str, List[str]], dataset: Dict[str, Any]) -> None:
         if not dataset.get('children'):
             return
         if not retval.get('children'):
@@ -43,20 +41,20 @@ class BlkDiscovery:
             for newkey, keys in keypairs.items():
                 value = self.extract_value(dataset['children'],child,keys)
                 if value:
-                    if type(value) == str:
+                    if isinstance(value, str):
                         value = value.strip()
                     if not (newkey == 'mountpoint' and value == 'None'):
                         retval['children'][child][newkey] = value
                 blkid = self.blkid.call_blkid(child)
                 value = self.extract_value(blkid,child,keys)
                 if value:
-                    if type(value) == str:
+                    if isinstance(value, str):
                         value = value.strip()
                     retval['children'][child][newkey] = value
             self.find_children(child,retval['children'][child],keypairs,dataset['children'][child])
         return
 
-    def consolidate_disk(self,disk,retval,datasetkeypairs):
+    def consolidate_disk(self, disk: str, retval: Dict[str, Any], datasetkeypairs: List[DatasetKeyPair]) -> None:
         for datasetkeypair in datasetkeypairs:
             if not datasetkeypair.get('dataset'):
                 raise ValueError("Missing required 'dataset' key in datasetkeypair")
@@ -67,11 +65,11 @@ class BlkDiscovery:
             for newkey, keys in keypairs.items():
                 value = self.extract_value(dataset,disk,keys)
                 if value:
-                    if type(value) == str:
+                    if isinstance(value, str):
                         value = value.strip()
                     retval[newkey] = value
 
-    def details(self):
+    def details(self) -> DeviceDetails:
         retval = {}
         disks = self.disks()
         hdparm = {}
@@ -146,7 +144,7 @@ class BlkDiscovery:
         self.scrub(retval)
         return retval
 
-    def check_if_mounted(self,parent):
+    def check_if_mounted(self, parent: Dict[str, Any]) -> bool:
         if parent.get('mountpoint'):
             return True
         if not parent.get('children'):
@@ -156,7 +154,7 @@ class BlkDiscovery:
                 return True
         return False
 
-    def scrub(self,retval):
+    def scrub(self, retval: Dict[str, Dict[str, Any]]) -> None:
         for disk, details in retval.items():
             if details.get('disk class'):
                 if re.search('SATA',details['disk class']):

@@ -1,8 +1,9 @@
 import subprocess
+from typing import Union, Dict, List, Any
 
 class BlkDiscoveryUtil:
 
-    def decimalsize(self,value):
+    def decimalsize(self, value: int, /) -> str:
         prefixes = "KMGTPEZY"
         i = 0
         out = ""
@@ -13,13 +14,13 @@ class BlkDiscoveryUtil:
         out += str(value)
 
         if i > len(prefixes):
-            raise "value too big"
+            raise ValueError("value too big")
         if i > 0:
             out += " " + prefixes[i - 1]
 
         return out + "B"
 
-    def binarysize(self,value):
+    def binarysize(self, value: int, /) -> str:
         prefixes = "KMGTPEZY"
         i = 0
         out = ""
@@ -30,30 +31,30 @@ class BlkDiscoveryUtil:
         out += str(value)
 
         if i > len(prefixes):
-            raise "value too big"
+            raise ValueError("value too big")
         if i > 0:
             out += " " + prefixes[i - 1]
 
         return out + "iB"
 
-    def stringify(self,json):
-        if type(json) == dict:
+    def stringify(self, json: Union[Dict[Any, Any], List[Any], Any]) -> Union[Dict[str, Any], List[str], str]:
+        if isinstance(json, dict):
             retval = {}
             for key, value  in json.items():
                 retval[str(key)] = self.stringify(value)
             return retval
-        if type(json) == list:
+        if isinstance(json, list):
             retval = []
             for element in json:
                 retval.append(self.stringify(element))
             return retval
         return str(json)
 
-    def subprocess_check_output(self,cmdarray):
+    def subprocess_check_output(self, cmdarray: List[str]) -> str:
         try:
             rawoutput = subprocess.check_output(cmdarray, stderr=subprocess.STDOUT)
         except Exception:
             return ""
-        if type(rawoutput) == bytes:
+        if isinstance(rawoutput, bytes):
             output = rawoutput.decode("utf-8")
         return output
