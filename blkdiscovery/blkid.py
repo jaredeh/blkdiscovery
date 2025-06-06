@@ -1,10 +1,6 @@
 import os
 import re
-#hack for python2 support
-try:
-    from .blkdiscoveryutil import *
-except:
-    from blkdiscoveryutil import *
+from .blkdiscoveryutil import *
 
 class Blkid(BlkDiscoveryUtil):
 
@@ -22,7 +18,7 @@ class Blkid(BlkDiscoveryUtil):
         disklist = []
         blockdevices = []
         for disk in os.listdir("/sys/block"):
-            blockdevices.append('/dev/' + disk)
+            blockdevices.append(f'/dev/{disk}')
         for path, details in output.items():
             if path in blockdevices:
                 disklist.append(path)

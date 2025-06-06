@@ -1,10 +1,6 @@
 import re
 import os
-#hack for python2 support
-try:
-    from .blkdiscoveryutil import *
-except:
-    from blkdiscoveryutil import *
+from .blkdiscoveryutil import *
 
 class LsStorageController(BlkDiscoveryUtil):
 
@@ -71,7 +67,7 @@ class LsStorageController(BlkDiscoveryUtil):
 
     def process_device(self,disk,pcidevices):
         details = {}
-        fullpath = "/dev/" + disk
+        fullpath = f"/dev/{disk}"
         self.get_pci_model(disk,pcidevices,details)
         self.get_storage_path(disk,details)
         self.platform(disk,details)

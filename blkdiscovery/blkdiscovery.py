@@ -59,9 +59,9 @@ class BlkDiscovery:
     def consolidate_disk(self,disk,retval,datasetkeypairs):
         for datasetkeypair in datasetkeypairs:
             if not datasetkeypair.get('dataset'):
-                raise
+                raise ValueError("Missing required 'dataset' key in datasetkeypair")
             if not datasetkeypair.get('keypairs'):
-                raise
+                raise ValueError("Missing required 'keypairs' key in datasetkeypair")
             dataset = datasetkeypair['dataset']
             keypairs =  datasetkeypair['keypairs']
             for newkey, keys in keypairs.items():

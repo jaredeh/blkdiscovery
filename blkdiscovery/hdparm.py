@@ -1,9 +1,5 @@
 import re
-#hack for python2 support
-try:
-    from .blkdiscoveryutil import *
-except:
-    from blkdiscoveryutil import *
+from .blkdiscoveryutil import *
 
 class Hdparm(BlkDiscoveryUtil):
 
@@ -21,7 +17,7 @@ class Hdparm(BlkDiscoveryUtil):
                 if len(s) > 1:
                     #exception for the first section where it's named for the device
                     if s[0] == device:
-                        line = "Path: " + device
+                        line = f"Path: {device}"
                     else:
                         section = s[0]
                         if len(s[1]) > 0:
@@ -59,7 +55,7 @@ class Hdparm(BlkDiscoveryUtil):
             devdata[section] = {}
         s = line.split(':')
         if len(s) < 2:
-            line = "long type:" + s[0]
+            line = f"long type:{s[0]}"
         self.parse_line_default(line,devdata,section)
 
     def parse_line_standards(self,ine,devdata,section):
@@ -87,7 +83,7 @@ class Hdparm(BlkDiscoveryUtil):
         if len(s) > 1:
             enabled = ': enabled'
             line = s[1]
-        line += enabled
+        line = f"{line}{enabled}"
         self.parse_line_default(line,devdata,"Features")
 
     def parse_line_security(self,line,devdata,section):
@@ -98,7 +94,7 @@ class Hdparm(BlkDiscoveryUtil):
             for subline in s:
                 s2 = subline.split('for')
                 if len(s2) > 1:
-                    key = self.single_space(s2[1] + " (seconds)")
+                    key = self.single_space(f"{s2[1]} (seconds)")
                     val = str(int(s2[0].strip().split('min')[0])*60)
                     devdata[section][key] = val
             return
@@ -107,7 +103,7 @@ class Hdparm(BlkDiscoveryUtil):
     def parse_line_indentifier(self,line,devdata,section):
         s = line.split(':')
         if len(s) < 2:
-            line = section + ":" + s[0]
+            line = f"{section}:{s[0]}"
         section = "Device"
         self.parse_line_default(line,devdata,section)
 

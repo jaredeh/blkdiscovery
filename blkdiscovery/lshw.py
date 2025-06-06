@@ -1,9 +1,5 @@
 import json
-#hack for python2 support
-try:
-    from .blkdiscoveryutil import *
-except:
-    from blkdiscoveryutil import *
+from .blkdiscoveryutil import *
 
 class LsHw(BlkDiscoveryUtil):
 
