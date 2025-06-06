@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-import pprint
+import json
 from .blkdiscovery import BlkDiscovery
 
 
 def main():
     """Main CLI entry point for blkdiscovery."""
-    pp = pprint.PrettyPrinter(indent=4)
     bd = BlkDiscovery()
     disks = bd.disks()
-    pp.pprint(disks)
     devdata = bd.details()
-    pp.pprint(devdata)
+    print(json.dumps(devdata, indent=4))
 
 
 if __name__ == "__main__":
