@@ -3,6 +3,7 @@ from . import hdparm
 from . import lsblk
 from . import lshw
 from . import lsstoragecntlr
+from . import nvme
 import re
 from typing import Dict, List, Optional, Any, Union
 from .types import DeviceDetails, DiskList, DatasetKeyPair
@@ -16,6 +17,7 @@ class BlkDiscovery:
         self.blkid: blkid.Blkid = blkid.Blkid()
         self.lsstoragecntlr: lsstoragecntlr.LsStorageController = lsstoragecntlr.LsStorageController()
         self.hdparm: hdparm.Hdparm = hdparm.Hdparm()
+        self.nvme: nvme.Nvme = nvme.Nvme()
 
     def disks(self) -> DiskList:
         return self.lsblk.disks()
@@ -56,9 +58,9 @@ class BlkDiscovery:
 
     def consolidate_disk(self, disk: str, retval: Dict[str, Any], datasetkeypairs: List[DatasetKeyPair]) -> None:
         for datasetkeypair in datasetkeypairs:
-            if not datasetkeypair.get('dataset'):
+            if 'dataset' not in datasetkeypair:
                 raise ValueError("Missing required 'dataset' key in datasetkeypair")
-            if not datasetkeypair.get('keypairs'):
+            if 'keypairs' not in datasetkeypair:
                 raise ValueError("Missing required 'keypairs' key in datasetkeypair")
             dataset = datasetkeypair['dataset']
             keypairs =  datasetkeypair['keypairs']
@@ -79,6 +81,7 @@ class BlkDiscovery:
         lshw = self.lshw.details()
         blkid = self.blkid.details()
         lsstoragecntlr = self.lsstoragecntlr.details()
+        nvme = self.nvme.details()
         diskkeypairs = [
             {'dataset': lsblk,
              'keypairs': {
@@ -90,6 +93,7 @@ class BlkDiscovery:
                 'vendor':           ['vendor'],
                 'serial':           ['serial'],
                 'firmware':         ['rev'],
+                'size':             ['size'],
                 }
             },
             {'dataset': hdparm,
@@ -114,6 +118,20 @@ class BlkDiscovery:
              'keypairs': {
                 'partition table type': ['PTTYPE'],
                 'partition table UUID': ['PTUUID'],
+                }
+            },
+            {'dataset': nvme,
+             'keypairs': {
+                'disk class':         ['disk class'],
+                'storage controller': ['storage controller'],
+                'storage path':       ['storage path'],
+                'model':              ['model'],
+                'serial':             ['serial'],
+                'firmware':           ['firmware'],
+                'WWN':                ['WWN'],
+                'bytes':              ['bytes'],
+                'size':               ['size'],
+                'fabric':             ['fabric'],
                 }
             },
         ]
