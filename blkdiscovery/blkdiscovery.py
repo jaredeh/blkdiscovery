@@ -5,8 +5,21 @@ from . import lshw
 from . import lsstoragecntlr
 from . import nvme
 import re
-from typing import Dict, List, Optional, Any, Union
-from .types import DeviceDetails, DiskList, DatasetKeyPair
+from typing import Any, Dict, List
+from .types import DatasetConfig, DeviceDetails, DeviceInfo, DiskList, PartitionInfo, create_dataset_configs
+
+
+# PartitionInfo attribute -> the key lsblk and blkid both report it under
+CHILD_FIELDS = {
+    'mountpoint': 'mountpoint',
+    'size': 'size',
+    'partition_table_type': 'PTTYPE',
+    'partition_table_UUID': 'PTUUID',
+    'format': 'TYPE',
+    'partition_UUID': 'PARTUUID',
+    'UUID': 'UUID',
+    'UUID_SUB': 'UUID_SUB',
+}
 
 
 class BlkDiscovery:
@@ -22,164 +35,75 @@ class BlkDiscovery:
     def disks(self) -> DiskList:
         return self.lsblk.disks()
 
-    def extract_value(self, dataset: Dict[str, Any], disk: str, keylist: List[str]) -> Optional[str]:
-        if not (data := dataset.get(disk)):
-            return None
-
-        for key in keylist:
-            if not (data := data.get(key)):
-                return None
-        return data
-
-
-    def find_children(self, disk: str, retval: Dict[str, Any], keypairs: Dict[str, List[str]], dataset: Dict[str, Any]) -> None:
-        if not dataset.get('children'):
-            return
-        if not retval.get('children'):
-            retval['children'] = {}
-        for child in dataset['children']:
-            if not retval['children'].get(child):
-                retval['children'][child] = {}
-            for newkey, keys in keypairs.items():
-                value = self.extract_value(dataset['children'],child,keys)
-                if value:
-                    if isinstance(value, str):
-                        value = value.strip()
-                    if not (newkey == 'mountpoint' and value == 'None'):
-                        retval['children'][child][newkey] = value
-                blkid = self.blkid.call_blkid(child)
-                value = self.extract_value(blkid,child,keys)
-                if value:
-                    if isinstance(value, str):
-                        value = value.strip()
-                    retval['children'][child][newkey] = value
-            self.find_children(child,retval['children'][child],keypairs,dataset['children'][child])
-        return
-
-    def consolidate_disk(self, disk: str, retval: Dict[str, Any], datasetkeypairs: List[DatasetKeyPair]) -> None:
-        for datasetkeypair in datasetkeypairs:
-            if 'dataset' not in datasetkeypair:
-                raise ValueError("Missing required 'dataset' key in datasetkeypair")
-            if 'keypairs' not in datasetkeypair:
-                raise ValueError("Missing required 'keypairs' key in datasetkeypair")
-            dataset = datasetkeypair['dataset']
-            keypairs =  datasetkeypair['keypairs']
-            for newkey, keys in keypairs.items():
-                value = self.extract_value(dataset,disk,keys)
-                if value:
-                    if isinstance(value, str):
-                        value = value.strip()
-                    retval[newkey] = value
+    def consolidate_disk(self, disk: str, device_info: DeviceInfo, dataset_configs: List[DatasetConfig]) -> None:
+        """Fill a DeviceInfo from every dataset that has something to say about this disk."""
+        for config in dataset_configs:
+            for attr, keys in config.keypairs.items():
+                if not (value := config.extract_value(disk, keys)):
+                    continue
+                if isinstance(value, str):
+                    if not (value := value.strip()):
+                        continue
+                    if attr == 'bytes' and value.isdigit():
+                        value = int(value)
+                setattr(device_info, attr, value)
 
     def details(self) -> DeviceDetails:
-        retval = {}
         disks = self.disks()
-        hdparm = {}
-        for disk in disks:
-            hdparm[disk] = self.hdparm.details(disk)
-        lsblk = self.lsblk.details()
-        lshw = self.lshw.details()
-        blkid = self.blkid.details()
-        lsstoragecntlr = self.lsstoragecntlr.details()
-        nvme = self.nvme.details()
-        diskkeypairs = [
-            {'dataset': lsblk,
-             'keypairs': {
-                'linux subsystems': ['subsystems'],
-                'linux scheduler':  ['sched'],
-                'storage bus':      ['tran'],
-                'minimum IO':       ['min-io'],
-                'model':            ['model'],
-                'vendor':           ['vendor'],
-                'serial':           ['serial'],
-                'firmware':         ['rev'],
-                'size':             ['size'],
-                }
-            },
-            {'dataset': hdparm,
-             'keypairs': {
-                'model':      ['Device','Model Number'],
-                'vendor':     ['Device','Vendor'],
-                'serial':     ['Device','Serial Number'],
-                'firmware':   ['Device','Firmware Revision'],
-                'disk class': ['Device','Transport'],
-                'WWN':        ['Device','Logical Unit WWN Device Identifier'],
-                'bytes':      ['Configuration','Disk Size','bytes'],
-                'size':       ['Configuration','Disk Size','human base10']
-                }
-            },
-            {'dataset': lsstoragecntlr,
-             'keypairs': {
-                'storage controller': ['controller'],
-                'storage path':       ['storagepath'],
-                }
-            },
-            {'dataset': blkid,
-             'keypairs': {
-                'partition table type': ['PTTYPE'],
-                'partition table UUID': ['PTUUID'],
-                }
-            },
-            {'dataset': nvme,
-             'keypairs': {
-                'disk class':         ['disk class'],
-                'storage controller': ['storage controller'],
-                'storage path':       ['storage path'],
-                'model':              ['model'],
-                'serial':             ['serial'],
-                'firmware':           ['firmware'],
-                'WWN':                ['WWN'],
-                'bytes':              ['bytes'],
-                'size':               ['size'],
-                'fabric':             ['fabric'],
-                }
-            },
-        ]
-        childkeypairs = {
-                'mountpoint':           ['mountpoint'],
-                'size':                 ['size'],
-                'partition table type': ['PTTYPE'],
-                'partition table UUID': ['PTUUID'],
-                'format':               ['TYPE'],
-                'partition UUID':       ['PARTUUID'],
-                'UUID':                 ['UUID'],
-                'UUID_SUB':             ['UUID_SUB'],
 
-        }
+        # Collect raw data from all sources
+        hdparm_data = {disk: self.hdparm.details(disk) for disk in disks}
+        lsblk_data = self.lsblk.details()
+        blkid_data = self.blkid.details()
+        lsstoragecntlr_data = self.lsstoragecntlr.details()
+        nvme_data = self.nvme.details()
+        dataset_configs = create_dataset_configs(lsblk_data, hdparm_data, lsstoragecntlr_data,
+                                                 blkid_data, nvme_data)
+
+        retval: DeviceDetails = {}
         for disk in disks:
-            if not retval.get(disk):
-                retval[disk] = {}
-            self.consolidate_disk(disk,retval[disk],diskkeypairs)
-            if not lsblk.get(disk):
-                continue
-            dataset = lsblk[disk]
-            #going to treat partitionless disks with filesystem as special cases
-            #where they are their own children
-            if blkid.get(disk):
-                if not blkid[disk].get("PTTYPE") and blkid[disk].get('TYPE'):
-                    dataset = {'children': {disk: lsblk[disk]}}
-            self.find_children(disk,retval[disk],childkeypairs,dataset)
-        self.scrub(retval)
+            device_info = DeviceInfo()
+            self.consolidate_disk(disk, device_info, dataset_configs)
+
+            if disk_lsblk := lsblk_data.get(disk):
+                dataset = disk_lsblk
+                #going to treat partitionless disks with filesystem as special cases
+                #where they are their own children
+                if disk_blkid := blkid_data.get(disk):
+                    if not disk_blkid.get("PTTYPE") and disk_blkid.get('TYPE'):
+                        dataset = {'children': {disk: disk_lsblk}}
+                self.process_children(device_info.children, dataset)
+
+            self.scrub_device_info(device_info)
+            retval[disk] = device_info
+
         return retval
 
-    def check_if_mounted(self, parent: Dict[str, Any]) -> bool:
-        if parent.get('mountpoint'):
-            return True
-        if not parent.get('children'):
-            return False
-        for child, details in parent['children'].items():
-            if self.check_if_mounted(details):
-                return True
-        return False
+    def process_children(self, children: Dict[str, PartitionInfo], dataset: Dict[str, Any]) -> None:
+        """Populate `children` with the partitions of `dataset`, recursing into stacked devices."""
+        for name, child_data in dataset.get('children', {}).items():
+            #blkid only reports partition details when called with the partition, weird
+            child_blkid = self.blkid.call_blkid(name).get(name, {})
+            attrs = {}
+            for attr, key in CHILD_FIELDS.items():
+                for source in (child_data, child_blkid):
+                    if not (value := source.get(key)):
+                        continue
+                    if isinstance(value, str):
+                        value = value.strip()
+                    if attr == 'mountpoint' and value == 'None':
+                        continue
+                    attrs[attr] = value
+            partition = PartitionInfo(**attrs)
+            children[name] = partition
+            self.process_children(partition.children, child_data)
 
-    def scrub(self, retval: Dict[str, Dict[str, Any]]) -> None:
-        for disk, details in retval.items():
-            if details.get('disk class'):
-                if re.search('SATA',details['disk class']):
-                    details['disk class'] = 'SATA'
-            if details.get('storage bus'):
-                details['storage bus'] = details['storage bus'].upper()
-            if self.check_if_mounted(details):
-                details['mounted'] = True
-            else:
-                details['mounted'] = False
+    def scrub_device_info(self, device_info: DeviceInfo) -> None:
+        """Clean up and normalize device information."""
+        if device_info.disk_class and re.search('SATA', device_info.disk_class):
+            device_info.disk_class = 'SATA'
+
+        if device_info.storage_bus:
+            device_info.storage_bus = device_info.storage_bus.upper()
+
+        device_info.mounted = device_info.is_mounted()
