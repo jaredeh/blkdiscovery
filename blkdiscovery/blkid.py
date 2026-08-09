@@ -9,7 +9,7 @@ class Blkid(BlkDiscoveryUtil):
         if len(diskline) < 2:
             return
         path = diskline[0]
-        for match in re.finditer('(\S+)\=\"([^\"]+)\"',diskline[1]):
+        for match in re.finditer(r'(\S+)="([^"]+)"',diskline[1]):
             details[match.group(1)] = match.group(2)
         return path, details
 
@@ -22,8 +22,8 @@ class Blkid(BlkDiscoveryUtil):
             if path in blockdevices:
                 disklist.append(path)
                 continue
-            m1 = re.search('(p\d+$)',path)
-            m2 = re.search('(\d+$)',path)
+            m1 = re.search(r'(p\d+$)',path)
+            m2 = re.search(r'(\d+$)',path)
             if not m2:
                 disklist.append(path)
                 continue

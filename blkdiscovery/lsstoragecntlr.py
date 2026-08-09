@@ -30,10 +30,10 @@ class LsStorageController(BlkDiscoveryUtil):
     def platform(self,disk,details):
         for item in self.sysblock().splitlines():
             if disk in item:
-                match = re.search('devices\/platform\/([^\/]+)\/',item)
+                match = re.search('devices/platform/([^/]+)/',item)
                 if match:
                     controller = match.group(1)
-                    m2 = re.search('(.*)\.(\d+)',controller)
+                    m2 = re.search(r'(.*)\.(\d+)',controller)
                     if m2:
                         name = m2.group(1)
                         details['controller'] = name

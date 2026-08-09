@@ -11,7 +11,7 @@ class Hdparm(BlkDiscoveryUtil):
         for line in hdparmdata:
             i += 1
             #pp.pprint(line)
-            m1 = re.match('^\S+',str(line))
+            m1 = re.match(r'^\S+',str(line))
             if m1:
                 s = line.rstrip().split(':')
                 if len(s) > 1:
@@ -69,14 +69,14 @@ class Hdparm(BlkDiscoveryUtil):
         devdata[section][s[0]] = s[1]
 
     def parse_line_configuration(self,line,devdata,section):
-        if re.match('^Logical\s+max\s+current$',line):
+        if re.match(r'^Logical\s+max\s+current$',line):
             return
-        if re.match('^\-\-$',line):
+        if re.match('^--$',line):
             return
         self.parse_line_default(line,devdata,section)
 
     def parse_line_features(self,line,devdata,section):
-        if re.match('^Enabled\s+Supported\:$',line):
+        if re.match(r'^Enabled\s+Supported:$',line):
             return
         enabled = ': disabled'
         s = line.split('*')
