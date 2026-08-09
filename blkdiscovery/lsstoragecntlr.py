@@ -1,6 +1,17 @@
 import re
 from .blkdiscoveryutil import *
 
+#a PCI address as it appears in a sysfs path, e.g. 0000:81:00.0
+PCI_ADDRESS_RE = re.compile(r'[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]')
+
+PCIE_LINK_FILES = {
+    'PCIe link speed': 'current_link_speed',
+    'PCIe link width': 'current_link_width',
+    'PCIe max link speed': 'max_link_speed',
+    'PCIe max link width': 'max_link_width',
+}
+
+
 class LsStorageController(BlkDiscoveryUtil):
 
     def get_block_devices(self):
@@ -64,12 +75,35 @@ class LsStorageController(BlkDiscoveryUtil):
             details['controller'] = model
             return
 
+    def pci_address(self,disk):
+        """The innermost PCI address in a disk's sysfs path, i.e. the endpoint it hangs off.
+
+        For NVMe that is the drive itself. For SATA/SAS/USB it is the HBA, whose
+        link is shared by every port on it.
+        """
+        target = self.runner.realpath(f"/sys/block/{disk}")
+        if not target:
+            return None
+        addresses = PCI_ADDRESS_RE.findall(target)
+        return addresses[-1] if addresses else None
+
+    def get_pcie_link(self,disk,details):
+        address = self.pci_address(disk)
+        if not address:
+            return
+        for key, filename in PCIE_LINK_FILES.items():
+            value = self.runner.read_file(f"/sys/bus/pci/devices/{address}/{filename}")
+            #non-PCIe parents report "Unknown"
+            if value and not value.startswith('Unknown'):
+                details[key] = value
+
     def process_device(self,disk,pcidevices):
         details = {}
         fullpath = f"/dev/{disk}"
         self.get_pci_model(disk,pcidevices,details)
         self.get_storage_path(disk,details)
         self.platform(disk,details)
+        self.get_pcie_link(disk,details)
 
         return fullpath, details
 

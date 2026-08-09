@@ -59,6 +59,10 @@ class DeviceInfo:
     storage_controller: Optional[str] = None
     storage_path: Optional[str] = None
     storage_bus: Optional[str] = None
+    PCIe_link_speed: Optional[str] = None
+    PCIe_link_width: Optional[str] = None
+    PCIe_max_link_speed: Optional[str] = None
+    PCIe_max_link_width: Optional[str] = None
     linux_subsystems: Optional[str] = None
     linux_scheduler: Optional[str] = None
     minimum_IO: Optional[str] = None
@@ -132,6 +136,10 @@ def create_dataset_configs(lsblk: Dict, hdparm: Dict, lsstoragecntlr: Dict,
             keypairs={
                 'storage_controller': ['controller'],
                 'storage_path': ['storagepath'],
+                'PCIe_link_speed': ['PCIe link speed'],
+                'PCIe_link_width': ['PCIe link width'],
+                'PCIe_max_link_speed': ['PCIe max link speed'],
+                'PCIe_max_link_width': ['PCIe max link width'],
             }
         ),
         DatasetConfig(

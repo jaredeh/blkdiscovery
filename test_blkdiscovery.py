@@ -7,6 +7,7 @@ from dataclasses import fields
 
 from blkdiscovery.blkdiscovery import BlkDiscovery
 from blkdiscovery.blkdiscoveryutil import LocalRunner, SshRunner
+from blkdiscovery.lsstoragecntlr import LsStorageController
 from blkdiscovery.types import DeviceInfo, PartitionInfo, create_dataset_configs
 
 
@@ -76,6 +77,42 @@ def test_to_dict():
         'children': {'/dev/sda1': {'mountpoint': '/', 'UUID_SUB': 'sub'}},
     }
     assert PartitionInfo().to_dict() == {}  # unset fields dropped, no empty children key
+
+
+def test_pcie_link():
+    """The endpoint is the innermost PCI address, not the root port above it."""
+    sysfs = {
+        '/sys/block/nvme0n1': '/sys/devices/pci0000:00/0000:00:01.1/0000:01:00.0/nvme/nvme0/nvme0n1',
+        '/sys/block/sda': '/sys/devices/pci0000:00/0000:00:01.3/0000:02:00.1/ata2/host1/block/sda',
+        '/sys/block/dm-0': '/sys/devices/virtual/block/dm-0',
+        '/sys/bus/pci/devices/0000:01:00.0/current_link_speed': '8.0 GT/s PCIe',
+        '/sys/bus/pci/devices/0000:01:00.0/current_link_width': '4',
+        '/sys/bus/pci/devices/0000:01:00.0/max_link_speed': '16.0 GT/s PCIe',
+        '/sys/bus/pci/devices/0000:01:00.0/max_link_width': '4',
+        '/sys/bus/pci/devices/0000:02:00.1/current_link_speed': 'Unknown speed',
+    }
+
+    class SysfsRunner:
+        read_file = staticmethod(sysfs.get)
+        realpath = staticmethod(sysfs.get)
+
+    lsc = LsStorageController(SysfsRunner())
+    assert lsc.pci_address('nvme0n1') == '0000:01:00.0'   # endpoint, not 0000:00:01.1
+    assert lsc.pci_address('dm-0') is None                # virtual device, no PCI at all
+
+    details = {}
+    lsc.get_pcie_link('nvme0n1', details)
+    assert details == {'PCIe link speed': '8.0 GT/s PCIe', 'PCIe link width': '4',
+                       'PCIe max link speed': '16.0 GT/s PCIe', 'PCIe max link width': '4'}
+
+    #a downtrained Gen4 drive reads Gen3 right now, so max is what makes it readable
+    assert details['PCIe link speed'] != details['PCIe max link speed']
+
+    details = {}
+    lsc.get_pcie_link('sda', details)
+    assert details == {}  # "Unknown speed" is not a speed
+    lsc.get_pcie_link('dm-0', details)
+    assert details == {}
 
 
 def test_ssh_command():
