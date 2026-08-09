@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Self-check for the dataset -> dataclass -> JSON pipeline. Run: python3 test_blkdiscovery.py"""
 
+import json
+import subprocess
 from dataclasses import fields
 
 from blkdiscovery.blkdiscovery import BlkDiscovery
+from blkdiscovery.blkdiscoveryutil import LocalRunner, SshRunner
 from blkdiscovery.types import DeviceInfo, PartitionInfo, create_dataset_configs
 
 
@@ -73,6 +76,106 @@ def test_to_dict():
         'children': {'/dev/sda1': {'mountpoint': '/', 'UUID_SUB': 'sub'}},
     }
     assert PartitionInfo().to_dict() == {}  # unset fields dropped, no empty children key
+
+
+def test_ssh_command():
+    runner = SshRunner('root@box', ssh_options=['-o', 'BatchMode=yes'])
+    assert runner.ssh_command(['hdparm', '-I', '/dev/sd a']) == [
+        'ssh', '-o', 'BatchMode=yes', 'root@box', "sudo -n hdparm -I '/dev/sd a'"]
+    assert SshRunner('box', sudo=False, ssh_options=[]).ssh_command(['lspci']) == [
+        'ssh', 'box', 'lspci']
+    #a dead host must degrade to "" the same way a missing local binary does
+    assert SshRunner('box', ssh_options=['-o', 'BatchMode=yes',
+                                         '-o', 'ProxyCommand=false']).run(['lspci']) == ""
+
+
+class ShellRunner(SshRunner):
+    """SshRunner with the ssh+sudo hop removed, so its remote shell commands run here.
+
+    Lets the shell-based sysfs emulation be checked against the real thing
+    without needing a second machine.
+    """
+
+    def __init__(self):
+        super().__init__('unused')
+
+    def run(self, cmdarray):
+        remote = self.ssh_command(cmdarray)[-1].replace('sudo -n ', '', 1)
+        try:
+            return subprocess.check_output(['sh', '-c', remote],
+                                           stderr=subprocess.DEVNULL).decode()
+        except Exception:
+            return ""
+
+
+def test_remote_filesystem_matches_local():
+    """cat/ls/readlink must answer what open/listdir/realpath answer."""
+    local, remote = LocalRunner(), ShellRunner()
+
+    assert remote.isdir('/sys/block') is True
+    assert remote.isdir('/sys/block/definitely-not-here') is False
+    assert sorted(remote.listdir('/sys/block')) == sorted(local.listdir('/sys/block'))
+    assert remote.listdir('/sys/block/definitely-not-here') == []
+    assert remote.realpath('/sys/block') == local.realpath('/sys/block')
+
+    disk = sorted(local.listdir('/sys/block'))[0]
+    path = f'/sys/block/{disk}/size'
+    assert remote.read_file(path) == local.read_file(path) != None
+    assert remote.read_file('/sys/block/definitely-not-here') is None
+    assert remote.run(['lsblk', '--json', '-O', '-p'])  # argv survives the quoting
+
+
+def test_unreachable_host_is_empty_not_a_traceback():
+    class DeadRunner:
+        run = staticmethod(lambda cmdarray: "")
+        read_file = staticmethod(lambda path: None)
+        listdir = staticmethod(lambda path: [])
+        realpath = staticmethod(lambda path: None)
+        isdir = staticmethod(lambda path: False)
+
+    assert BlkDiscovery(runner=DeadRunner()).details() == {}
+
+
+def test_runner_is_the_only_way_out():
+    """Every disk fact must arrive through the runner, or --host silently reports local data."""
+    lsblk = {'blockdevices': [{'name': '/dev/sda', 'type': 'disk', 'tran': 'sata',
+                               'children': [{'name': '/dev/sda1', 'mountpoint': '/mnt'}]}]}
+
+    class FakeRunner:
+        def __init__(self):
+            self.commands = []
+
+        def run(self, cmdarray):
+            self.commands.append(cmdarray[0])
+            if cmdarray[0] == 'lsblk':
+                return json.dumps(lsblk)
+            if cmdarray[0] == 'blkid':
+                return '/dev/sda: PTTYPE="gpt"\n/dev/sda1: TYPE="ext4"\n'
+            return ""
+
+        def read_file(self, path):
+            return None
+
+        def listdir(self, path):
+            return ['sda'] if path == '/sys/block' else []
+
+        def realpath(self, path):
+            return path
+
+        def isdir(self, path):
+            return True
+
+    runner = FakeRunner()
+    details = BlkDiscovery(runner=runner).details()
+
+    assert list(details) == ['/dev/sda'], details
+    sda = details['/dev/sda'].to_dict()
+    assert sda['storage bus'] == 'SATA', sda
+    assert sda['partition table type'] == 'gpt', sda
+    assert sda['mounted'] is True, sda
+    assert sda['children']['/dev/sda1']['format'] == 'ext4', sda
+    #the nvme/lsstoragecntlr sysfs walks went through the runner too, not os.listdir
+    assert 'hdparm' in runner.commands and 'lspci' in runner.commands
 
 
 if __name__ == '__main__':

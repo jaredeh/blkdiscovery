@@ -42,7 +42,7 @@ class Hdparm(BlkDiscoveryUtil):
 
     def read_hdparm_data(self,device):
         try:
-            rawdata = self.subprocess_check_output(['hdparm', '-I', device])
+            rawdata = self.runner.run(['hdparm', '-I', device])
             return rawdata.splitlines()
         except:
             return [""]

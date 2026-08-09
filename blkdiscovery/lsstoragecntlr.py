@@ -1,22 +1,21 @@
 import re
-import os
 from .blkdiscoveryutil import *
 
 class LsStorageController(BlkDiscoveryUtil):
 
     def get_block_devices(self):
         devicepath = "/sys/block"
-        diskdevices = os.listdir(devicepath)
+        diskdevices = self.runner.listdir(devicepath)
         return diskdevices
 
     def lspci_data(self):
-        return self.subprocess_check_output(['lspci'])
+        return self.runner.run(['lspci'])
 
     def diskbypaths(self):
-        return self.subprocess_check_output(['ls', '-alh', '/dev/disk/by-path'])
+        return self.runner.run(['ls', '-alh', '/dev/disk/by-path'])
 
     def sysblock(self):
-        return self.subprocess_check_output(['ls', '-alh', '/sys/block/'])
+        return self.runner.run(['ls', '-alh', '/sys/block/'])
 
     def disk_pcideviceid(self,diskdevice):
         for item in self.diskbypaths().splitlines():

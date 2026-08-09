@@ -31,7 +31,7 @@ class LsHw(BlkDiscoveryUtil):
 
     def details(self):
         retval = {}
-        rawoutput = self.subprocess_check_output(["lshw", '-json'])
+        rawoutput = self.runner.run(["lshw", '-json'])
         try:
             parent = json.loads(rawoutput)
         except:

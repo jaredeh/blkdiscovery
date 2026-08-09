@@ -5,7 +5,8 @@ from . import lshw
 from . import lsstoragecntlr
 from . import nvme
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from .blkdiscoveryutil import LocalRunner, SshRunner
 from .types import DatasetConfig, DeviceDetails, DeviceInfo, DiskList, PartitionInfo, create_dataset_configs
 
 
@@ -24,13 +25,19 @@ CHILD_FIELDS = {
 
 class BlkDiscovery:
 
-    def __init__(self) -> None:
-        self.lsblk: lsblk.LsBlk = lsblk.LsBlk()
-        self.lshw: lshw.LsHw = lshw.LsHw()
-        self.blkid: blkid.Blkid = blkid.Blkid()
-        self.lsstoragecntlr: lsstoragecntlr.LsStorageController = lsstoragecntlr.LsStorageController()
-        self.hdparm: hdparm.Hdparm = hdparm.Hdparm()
-        self.nvme: nvme.Nvme = nvme.Nvme()
+    def __init__(self, host: Optional[str] = None, runner: Optional[Any] = None) -> None:
+        """Discover local block devices, or those of `host` when given.
+
+        `runner` overrides both and is the seam for anything else that can run
+        a command and read a file.
+        """
+        self.runner = runner or (SshRunner(host) if host else LocalRunner())
+        self.lsblk: lsblk.LsBlk = lsblk.LsBlk(self.runner)
+        self.lshw: lshw.LsHw = lshw.LsHw(self.runner)
+        self.blkid: blkid.Blkid = blkid.Blkid(self.runner)
+        self.lsstoragecntlr: lsstoragecntlr.LsStorageController = lsstoragecntlr.LsStorageController(self.runner)
+        self.hdparm: hdparm.Hdparm = hdparm.Hdparm(self.runner)
+        self.nvme: nvme.Nvme = nvme.Nvme(self.runner)
 
     def disks(self) -> DiskList:
         return self.lsblk.disks()

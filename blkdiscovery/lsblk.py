@@ -27,8 +27,12 @@ class LsBlk(BlkDiscoveryUtil):
 
     def details(self):
         retval = {}
-        rawoutput = self.subprocess_check_output(["lsblk", '--json', '-O', '-p'])
-        parent = json.loads(rawoutput)
+        rawoutput = self.runner.run(["lsblk", '--json', '-O', '-p'])
+        try:
+            parent = json.loads(rawoutput)
+        except ValueError:
+            #no lsblk, not root, or an unreachable --host
+            parent = {}
         for child in parent.get('blockdevices',[]):
             #print child['id'] + child['class']
             path = child.get('name')

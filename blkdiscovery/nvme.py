@@ -13,13 +13,6 @@ class Nvme(BlkDiscoveryUtil):
 
     NS_RE = re.compile(r'^nvme\d+n\d+$')
 
-    def _read(self, path):
-        try:
-            with open(path) as f:
-                return f.read().strip()
-        except (OSError, IOError):
-            return None
-
     def _resolve_controller(self, ns):
         """Map a namespace name (e.g. 'nvme0n1') to its controller name (e.g. 'nvme0').
 
@@ -28,33 +21,27 @@ class Nvme(BlkDiscoveryUtil):
         one or more controllers as siblings. Prefer a 'live' one, otherwise
         the first.
         """
-        link = f'/sys/block/{ns}/device'
-        try:
-            target = os.path.realpath(link)
-        except OSError:
+        target = self.runner.realpath(f'/sys/block/{ns}/device')
+        if not target:
             return None
         base = os.path.basename(target)
         if re.match(r'^nvme\d+$', base):
             return base
         # subsystem dir: scan for controller siblings
-        try:
-            entries = os.listdir(target)
-        except OSError:
-            return None
+        entries = self.runner.listdir(target)
         controllers = sorted(e for e in entries if re.match(r'^nvme\d+$', e))
         if not controllers:
             return None
         for c in controllers:
-            state = self._read(f'/sys/class/nvme/{c}/state')
+            state = self.runner.read_file(f'/sys/class/nvme/{c}/state')
             if state == 'live':
                 return c
         return controllers[0]
 
     def _resolve_subsys_dir(self, ns):
         """Resolve the nvme-subsystem sysfs dir for a namespace, if any."""
-        try:
-            target = os.path.realpath(f'/sys/block/{ns}')
-        except OSError:
+        target = self.runner.realpath(f'/sys/block/{ns}')
+        if not target:
             return None
         # e.g. /sys/devices/virtual/nvme-subsystem/nvme-subsys0/nvme0n1
         m = re.match(r'(.*/nvme-subsys\d+)/', target + '/')
@@ -77,7 +64,7 @@ class Nvme(BlkDiscoveryUtil):
         return out
 
     def _size_bytes(self, ns):
-        sectors = self._read(f'/sys/block/{ns}/size')
+        sectors = self.runner.read_file(f'/sys/block/{ns}/size')
         if sectors is None:
             return None
         try:
@@ -95,7 +82,7 @@ class Nvme(BlkDiscoveryUtil):
 
     def _wwn(self, ns):
         for fname in ('wwid', 'nguid', 'uuid'):
-            v = self._read(f'/sys/block/{ns}/{fname}')
+            v = self.runner.read_file(f'/sys/block/{ns}/{fname}')
             if v and v.lower() not in self._ZERO_WWNS:
                 return v
         return None
@@ -117,12 +104,12 @@ class Nvme(BlkDiscoveryUtil):
             return details
 
         ctrl_dir = f'/sys/class/nvme/{controller}'
-        transport = self._read(f'{ctrl_dir}/transport') or 'pcie'
-        addr = self._read(f'{ctrl_dir}/address')
-        subsysnqn = self._read(f'{ctrl_dir}/subsysnqn')
-        model = self._read(f'{ctrl_dir}/model')
-        serial = self._read(f'{ctrl_dir}/serial')
-        firmware = self._read(f'{ctrl_dir}/firmware_rev')
+        transport = self.runner.read_file(f'{ctrl_dir}/transport') or 'pcie'
+        addr = self.runner.read_file(f'{ctrl_dir}/address')
+        subsysnqn = self.runner.read_file(f'{ctrl_dir}/subsysnqn')
+        model = self.runner.read_file(f'{ctrl_dir}/model')
+        serial = self.runner.read_file(f'{ctrl_dir}/serial')
+        firmware = self.runner.read_file(f'{ctrl_dir}/firmware_rev')
 
         if model:
             details['model'] = model
@@ -154,13 +141,13 @@ class Nvme(BlkDiscoveryUtil):
             fabric = {'transport': transport}
             if subsysnqn:
                 fabric['NQN'] = subsysnqn
-            hostnqn = self._read(f'{ctrl_dir}/hostnqn')
+            hostnqn = self.runner.read_file(f'{ctrl_dir}/hostnqn')
             if hostnqn:
                 fabric['host NQN'] = hostnqn
-            hostid = self._read(f'{ctrl_dir}/hostid')
+            hostid = self.runner.read_file(f'{ctrl_dir}/hostid')
             if hostid:
                 fabric['host ID'] = hostid
-            state = self._read(f'{ctrl_dir}/state')
+            state = self.runner.read_file(f'{ctrl_dir}/state')
             if state:
                 fabric['connection state'] = state
             for k in ('traddr', 'trsvcid', 'host_traddr', 'src_addr'):
@@ -168,7 +155,7 @@ class Nvme(BlkDiscoveryUtil):
                     fabric[k] = parts[k]
             subsys_dir = self._resolve_subsys_dir(ns)
             if subsys_dir:
-                iopolicy = self._read(f'{subsys_dir}/iopolicy')
+                iopolicy = self.runner.read_file(f'{subsys_dir}/iopolicy')
                 if iopolicy:
                     fabric['IO policy'] = iopolicy
             details['fabric'] = fabric
@@ -178,9 +165,9 @@ class Nvme(BlkDiscoveryUtil):
     def details(self):
         retval = {}
         sysblock = '/sys/block'
-        if not os.path.isdir(sysblock):
+        if not self.runner.isdir(sysblock):
             return {}
-        for name in sorted(os.listdir(sysblock)):
+        for name in sorted(self.runner.listdir(sysblock)):
             if not self.NS_RE.match(name):
                 continue
             path = f'/dev/{name}'

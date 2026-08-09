@@ -1,4 +1,3 @@
-import os
 import re
 from .blkdiscoveryutil import *
 
@@ -17,7 +16,7 @@ class Blkid(BlkDiscoveryUtil):
     def find_disks(self,output):
         disklist = []
         blockdevices = []
-        for disk in os.listdir("/sys/block"):
+        for disk in self.runner.listdir("/sys/block"):
             blockdevices.append(f'/dev/{disk}')
         for path, details in output.items():
             if path in blockdevices:
@@ -54,11 +53,11 @@ class Blkid(BlkDiscoveryUtil):
 
     def call_blkid(self,device=None):
         retval = {}
-        self.subprocess_check_output(["blkid", '-g'])
+        self.runner.run(["blkid", '-g'])
         cmdarray = ["blkid", '-o', 'full']
         if device:
             cmdarray.append(device)
-        rawoutput = self.subprocess_check_output(cmdarray)
+        rawoutput = self.runner.run(cmdarray)
         for line in rawoutput.splitlines():
             path, details = self.parse_line(line)
             retval[path] = details
